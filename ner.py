@@ -29,8 +29,13 @@ def getPOSandWordLists(trainData):
 
 def generateBigrams(wordList):
     return zip(wordList, wordList[1:])
-# def tagTransitionProbabilities(testData):
-#     return
+
+# def tagTransitionProbabilities(bigram):
+    #transition = {}
+    #for line in bigram:
+       # if line not in transition:
+            $trans[line] = float(bigrams[line])/(float(tagfrequency[line[1]]))
+#trans_prob = transition_probability(bigrams)
 
 InputFileName = "S21-gene-train.txt"
 trainingData = open(InputFileName, 'r').readlines()
