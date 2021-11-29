@@ -1,107 +1,101 @@
 import re
-from sklearn.model_selection import train_test_split
 
-def getSentences(trainingData):
-    numberCheck = "(^[0-9])"
-    newLine = list()
-    sentenceArray = list()
+def structureTrainingData(trainingData):
+    numberRegex = "(^[0-9])"
+    sentence = list()
+    structuredTrainingData = list()
 
     for line in trainingData:
-        check = re.search(numberCheck, line)
         line.strip()
-        line = line.split("\n")[0]
-        chunks = line.split("\t")
-        if check:
-            newLine.append((chunks[1], chunks[2]))
+        if re.search(numberRegex, line):
+            chunks = line.split("\n")[0].split("\t")
+            sentence.append((chunks[1], chunks[2]))
         else:
-            sentenceArray.append(newLine)
-            newLine = []
-    return sentenceArray
+            structuredTrainingData.append(sentence)
+            sentence = []
+    return structuredTrainingData
 
-def getPOSandWordLists(trainData):
-    wordList = list()
-    tagList = list()
-    states = list()
+def analyzeTrainingData(structuredTrainingData):
     words = list()
-    stateCounts = dict()
+    tags = list()
+    tagCounts = dict()
     wordCounts = dict()
-    for sentence in trainData:
-        
+
+    for sentence in structuredTrainingData:
         for word, tag in sentence:
-            wordList.append(word)
-            tagList.append(tag)
-            states.append(tag)
             words.append(word)
-            if tag not in stateCounts:
-                stateCounts[tag] = 0
-            else: 
-                stateCounts[tag] += 1
-            if word not in wordCounts:    
-                wordCounts[word] = 0
-            else:
-                wordCounts[word] += 1
+            tags.append(tag)
+            wordCounts[word] = wordCounts[word] + 1 if word in wordCounts else 1
+            tagCounts[tag] = tagCounts[tag] + 1 if tag in tagCounts else 1
            
-    print("stateCounts: ", stateCounts)
-    return wordList, tagList, stateCounts, wordCounts, states, words
+    return words, tags, tagCounts, wordCounts
 
-def tagTransitionProbabilities(tagList, stateCounts):
+
+def handleUnkowns(words, tags, tagCounts, wordCounts):
+    singleFrequencyWordsCount = 0
+    for index in range(len(words)):
+        if wordCounts[words[index]] == 1:
+            singleFrequencyWordsCount += 1
+            del wordCounts[words[index]]
+            words[index] = '<UNK>'
     
-    bigrams = zip(tagList, tagList[1:])
-    tagTransnProbs = dict()
+    wordCounts['<UNK>'] = singleFrequencyWordsCount
+    return words, tags, tagCounts, wordCounts
 
-    for i in stateCounts.keys():
-        tagTransnProbs[i] = dict()
-        for j in stateCounts.keys():
-            tagTransnProbs[i][j] = 0
+def getTagTransitionProbabilities(tags, tagCounts):
+    tagTransitionProbabilities = dict()
     
-    for bigram in bigrams:
-        if bigram[0] in tagTransnProbs:
-            if bigram[1] in tagTransnProbs[bigram[0]]:
-                tagTransnProbs[bigram[0]][bigram[1]] += 1
+    for bigram in zip(tags, tags[1:]):
+        if bigram[0] not in tagTransitionProbabilities:
+            tagTransitionProbabilities[bigram[0]] = dict()
+        if bigram[1] not in tagTransitionProbabilities[bigram[0]]:
+            tagTransitionProbabilities[bigram[0]][bigram[1]] = 0
+        tagTransitionProbabilities[bigram[0]][bigram[1]] += 1
     
-    for i in tagTransnProbs:
-        for j in tagTransnProbs[i]:
-            tagTransnProbs[i][j] = round(tagTransnProbs[i][j] / stateCounts[i], 2)
+    for tag1 in tagTransitionProbabilities:
+        for tag2 in tagTransitionProbabilities[tag1]:
+            tagTransitionProbabilities[tag1][tag2] = round(tagTransitionProbabilities[tag1][tag2] / tagCounts[tag1], 2)
 
-    return tagTransnProbs
+    return tagTransitionProbabilities
 
-def tagEmissionProbabilities(wordCounts, stateCounts, words, states):
-    tagEmissionProbs = dict()
+def getEmissionProbabilities(words, tags, tagCounts):
+    emissionProbabilities = dict()
 
-    for i in stateCounts.keys():
-        tagEmissionProbs[i] = dict()
-        for j in wordCounts.keys():
-            tagEmissionProbs[i][j] = 0
-
-    wordTagCombos = zip(words, states)
-
-    for wordTagCombo in wordTagCombos:
-        word = wordTagCombo[0]
-        tag = wordTagCombo[1]
-        if tag in tagEmissionProbs:
-            if word in tagEmissionProbs[tag]:
-                tagEmissionProbs[tag][word] += 1
+    for word, tag in zip(words, tags):
+        if tag not in emissionProbabilities:
+            emissionProbabilities[tag] = dict()
+        if word not in emissionProbabilities[tag]:
+            emissionProbabilities[tag][word] = 0
+        emissionProbabilities[tag][word] += 1
     
-    for tag in tagEmissionProbs:
-        for word in tagEmissionProbs[tag]:
-            tagEmissionProbs[tag][word] = round(tagEmissionProbs[tag][word] / wordCounts[word], 2)
+    for tag in emissionProbabilities:
+        for word in emissionProbabilities[tag]:
+            emissionProbabilities[tag][word] = round(emissionProbabilities[tag][word] / tagCounts[tag], 2)
 
-    print("tagEmissionProbs: ", tagEmissionProbs)
-    return tagEmissionProbs
+    return emissionProbabilities
 
-def handleUnkowns(wordList, tagList, stateCounts, wordCounts, states, words):
+def getStartingProbabilities(structuredTrainingData):
+    startingProbabilities = dict()
     
-    return wordList, tagList, stateCounts, wordCounts, states, words
+    for sentence in structuredTrainingData:
+        if sentence[0] and sentence[0][1]:
+            if sentence[0][1] not in startingProbabilities:
+                startingProbabilities[sentence[0][1]] = 0
+            startingProbabilities[sentence[0][1]] += 1
+    
+    for tag in startingProbabilities:
+        startingProbabilities[tag] = round(startingProbabilities[tag] / len(structuredTrainingData), 2)
+                
+    return startingProbabilities
 
-InputFileName = "S21-gene-train.txt"
+trainingFileName = "S21-gene-train.txt"
+rawTrainingData = open(trainingFileName, 'r').readlines()
 
-trainingData = open(InputFileName, 'r').readlines()
+structuredTrainingData = structureTrainingData(rawTrainingData)
+words, tags, tagCounts, wordCounts = analyzeTrainingData(structuredTrainingData)
 
-sentenceArray = getSentences(trainingData)
-traindata, testData = train_test_split(sentenceArray, test_size=0.2)
-wordList, tagList, stateCounts, wordCounts, states, words = getPOSandWordLists(traindata)
+words, tags, tagCounts, wordCounts = handleUnkowns(words, tags, tagCounts, wordCounts)
 
-wordList, tagList, stateCounts, wordCounts, states, words = handleUnkowns(wordList, tagList, stateCounts, wordCounts, states, words)
-
-tagTransnProbs = tagTransitionProbabilities(tagList, stateCounts)
-tagEmissionProbs = tagEmissionProbabilities(wordCounts, stateCounts, words, states)
+tagTransitionProbabilities = getTagTransitionProbabilities(tags, tagCounts)
+emissionProbabilities = getEmissionProbabilities(words, tags, tagCounts)
+startingProbabilities = getStartingProbabilities(structuredTrainingData)
