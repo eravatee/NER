@@ -21,27 +21,87 @@ def getSentences(trainingData):
 def getPOSandWordLists(trainData):
     wordList = list()
     tagList = list()
+    states = list()
+    words = list()
+    stateCounts = dict()
+    wordCounts = dict()
     for sentence in trainData:
+        
         for word, tag in sentence:
             wordList.append(word)
             tagList.append(tag)
-    return wordList, tagList
+            states.append(tag)
+            words.append(word)
+            if tag not in stateCounts:
+                stateCounts[tag] = 0
+            else: 
+                stateCounts[tag] += 1
+            if word not in wordCounts:    
+                wordCounts[word] = 0
+            else:
+                wordCounts[word] += 1
+           
+    print("stateCounts: ", stateCounts)
+    return wordList, tagList, stateCounts, wordCounts, states, words
 
-def generateBigrams(wordList):
-    return zip(wordList, wordList[1:])
+def tagTransitionProbabilities(tagList, stateCounts):
+    
+    bigrams = zip(tagList, tagList[1:])
+    tagTransnProbs = dict()
 
-# def tagTransitionProbabilities(bigram):
-    #transition = {}
-    #for line in bigram:
-       # if line not in transition:
-            $trans[line] = float(bigrams[line])/(float(tagfrequency[line[1]]))
-#trans_prob = transition_probability(bigrams)
+    for i in stateCounts.keys():
+        tagTransnProbs[i] = dict()
+        for j in stateCounts.keys():
+            tagTransnProbs[i][j] = 0
+    
+    for bigram in bigrams:
+        if bigram[0] in tagTransnProbs:
+            if bigram[1] in tagTransnProbs[bigram[0]]:
+                tagTransnProbs[bigram[0]][bigram[1]] += 1
+    
+    for i in tagTransnProbs:
+        for j in tagTransnProbs[i]:
+            tagTransnProbs[i][j] = round(tagTransnProbs[i][j] / stateCounts[i], 2)
+
+    return tagTransnProbs
+
+def tagEmissionProbabilities(wordCounts, stateCounts, words, states):
+    tagEmissionProbs = dict()
+
+    for i in stateCounts.keys():
+        tagEmissionProbs[i] = dict()
+        for j in wordCounts.keys():
+            tagEmissionProbs[i][j] = 0
+
+    wordTagCombos = zip(words, states)
+
+    for wordTagCombo in wordTagCombos:
+        word = wordTagCombo[0]
+        tag = wordTagCombo[1]
+        if tag in tagEmissionProbs:
+            if word in tagEmissionProbs[tag]:
+                tagEmissionProbs[tag][word] += 1
+    
+    for tag in tagEmissionProbs:
+        for word in tagEmissionProbs[tag]:
+            tagEmissionProbs[tag][word] = round(tagEmissionProbs[tag][word] / wordCounts[word], 2)
+
+    print("tagEmissionProbs: ", tagEmissionProbs)
+    return tagEmissionProbs
+
+def handleUnkowns(wordList, tagList, stateCounts, wordCounts, states, words):
+    
+    return wordList, tagList, stateCounts, wordCounts, states, words
 
 InputFileName = "S21-gene-train.txt"
+
 trainingData = open(InputFileName, 'r').readlines()
+
 sentenceArray = getSentences(trainingData)
 traindata, testData = train_test_split(sentenceArray, test_size=0.2)
-wordList, tagList = getPOSandWordLists(traindata)
-bigrams = generateBigrams(wordList)
-print(bigrams)
-# print("sentence: ", sentenceArray)
+wordList, tagList, stateCounts, wordCounts, states, words = getPOSandWordLists(traindata)
+
+wordList, tagList, stateCounts, wordCounts, states, words = handleUnkowns(wordList, tagList, stateCounts, wordCounts, states, words)
+
+tagTransnProbs = tagTransitionProbabilities(tagList, stateCounts)
+tagEmissionProbs = tagEmissionProbabilities(wordCounts, stateCounts, words, states)
