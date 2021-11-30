@@ -84,7 +84,7 @@ def getStartingProbabilities(structuredTrainingData):
             startingProbabilities[sentence[0][1]] += 1
     
     for tag in tagCounts:
-        startingProbabilities[tag] = (startingProbabilities[tag] if tag in startingProbabilities else 0) / len(structuredTrainingData)
+        startingProbabilities[tag] = ((startingProbabilities[tag] if tag in startingProbabilities else 0) + 1) / (len(structuredTrainingData) + len(tagCounts))
                 
     return startingProbabilities
 
@@ -107,14 +107,25 @@ def viterbi(structuredTestingData, tagCounts, startingProbabilities, tagTransiti
                 backTrack[tag].append(maxProbability[1])
     
         ans = max([(viterbiProbabilities[tag][-1], tag) for tag in list(tagCounts.keys())])
-        start = ans[1]
+        predictedTag = ans[1]
         
-        print(viterbiProbabilities)
+        for i in range(len(sentence)):
+            sentence[-1 -i].append(predictedTag)
+            predictedTag = backTrack[predictedTag][-1 - i]
 
-        # for i in range(len(sentence)):
-        #     start = backTrack[start][-1 - i]
-        #     if start != 'O' and start != 0:
-        #         print(sentence[-1 -i], start)
+    return structuredTestingData
+
+def writeNEROutputData(structuredTestingData):
+    newSentences = ''
+    for sentence in structuredTestingData:
+        newSentence = ''
+        for index, line in enumerate(sentence):
+            newLine = ''
+            newLine = '\t'.join(line)
+            newLine = str(index) + '\t' + newLine + '\n'
+            newSentence = newSentence + newLine
+        newSentences = newSentences + newSentence + '\n'
+    return newSentences
                 
 trainingFileName = "S21-gene-train.txt"
 rawTrainingData = open(trainingFileName, 'r').readlines()
@@ -132,4 +143,9 @@ testFileNAme = "F21-gene-test.txt"
 rawTestingData = open(testFileNAme, 'r').readlines()
 structuredTestingData = structureTrainingData(rawTestingData)
 
-viterbi(structuredTestingData[:1], tagCounts, startingProbabilities, tagTransitionProbabilities, wordCounts, emissionProbabilities)
+structuredTestingData = viterbi(structuredTestingData[:2], tagCounts, startingProbabilities, tagTransitionProbabilities, wordCounts, emissionProbabilities)
+
+newSentences =  writeNEROutputData(structuredTestingData)
+f = open("demofile1.txt", "a")
+f.write(newSentences)
+f.close()
