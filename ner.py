@@ -1,4 +1,5 @@
 import re
+from sklearn.model_selection import train_test_split
 
 def structureTrainingData(trainingData):
     numberRegex = "(^[0-9])"
@@ -74,7 +75,7 @@ def getEmissionProbabilities(words, tags, tagCounts):
 
     return emissionProbabilities
 
-def getStartingProbabilities(structuredTrainingData):
+def getStartingProbabilities(structuredTrainingData, tagCounts):
     startingProbabilities = dict()
     
     for sentence in structuredTrainingData:
@@ -116,16 +117,18 @@ def viterbi(structuredTestingData, tagCounts, startingProbabilities, tagTransiti
     return structuredTestingData
 
 def writeNEROutputData(structuredTestingData):
+    f = open("demofile1.txt", "a")
     newSentences = ''
     for sentence in structuredTestingData:
         newSentence = ''
         for index, line in enumerate(sentence):
             newLine = ''
             newLine = '\t'.join(line)
-            newLine = str(index) + '\t' + newLine + '\n'
+            newLine = str(index + 1) + '\t' + newLine + '\n'
             newSentence = newSentence + newLine
-        newSentences = newSentences + newSentence + '\n'
-    return newSentences
+        f.write(newSentence + '\n')
+    f.close()
+
                 
 trainingFileName = "S21-gene-train.txt"
 rawTrainingData = open(trainingFileName, 'r').readlines()
@@ -137,15 +140,47 @@ words, tags, tagCounts, wordCounts = handleUnkowns(words, tags, tagCounts, wordC
 
 tagTransitionProbabilities = getTagTransitionProbabilities(tags, tagCounts)
 emissionProbabilities = getEmissionProbabilities(words, tags, tagCounts)
-startingProbabilities = getStartingProbabilities(structuredTrainingData)
+startingProbabilities = getStartingProbabilities(structuredTrainingData, tagCounts)
 
-testFileNAme = "F21-gene-test.txt"
+testFileNAme = "test-data.txt"
 rawTestingData = open(testFileNAme, 'r').readlines()
 structuredTestingData = structureTrainingData(rawTestingData)
 
-structuredTestingData = viterbi(structuredTestingData[:2], tagCounts, startingProbabilities, tagTransitionProbabilities, wordCounts, emissionProbabilities)
+
+structuredTestingData = viterbi(structuredTestingData, tagCounts, startingProbabilities, tagTransitionProbabilities, wordCounts, emissionProbabilities)
 
 newSentences =  writeNEROutputData(structuredTestingData)
-f = open("demofile1.txt", "a")
-f.write(newSentences)
-f.close()
+
+
+
+# print("structuredTrainingData: ", len(structuredTrainingData))
+# print("rawTrainingData: ", rawTrainingData[0])
+# i = 0
+# f = open("ner_output.txt", "a")
+# for line in rawTrainingData:
+#     numberRegex = "(^[0-9])"
+#     if i == 2759:
+#         break
+#     if re.search(numberRegex, line):
+#         f.write(line)
+#     else:
+#         f.write("\n")
+#         i += 1
+# f.close()
+
+# evalData = open("ner_output.txt", "r").readlines()
+
+# f = open("test-data.txt", "a")
+# # splitTestData = list()
+# # sentence_1 = []
+# for line in evalData:
+#     line.strip()
+#     numberRegex = "(^[0-9])"
+#     if re.search(numberRegex, line):
+#         chunks = line.split("\n")[0].split("\t")
+#         f.write(chunks[0] + "\t" + chunks[1] + "\n")
+#     else:     
+#         f.write(line)
+# f.close()
+
+# train, validation= train_test_split(structuredTrainingData, test_size=0.2)
