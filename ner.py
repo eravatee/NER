@@ -9,7 +9,7 @@ def structureTrainingData(trainingData):
         line.strip()
         if re.search(numberRegex, line):
             chunks = line.split("\n")[0].split("\t")
-            sentence.append((chunks[1], chunks[2]))
+            sentence.append([chunk for chunk in chunks[1:]])
         else:
             structuredTrainingData.append(sentence)
             sentence = []
@@ -52,9 +52,9 @@ def getTagTransitionProbabilities(tags, tagCounts):
             tagTransitionProbabilities[bigram[0]][bigram[1]] = 0
         tagTransitionProbabilities[bigram[0]][bigram[1]] += 1
     
-    for tag1 in tagTransitionProbabilities:
-        for tag2 in tagTransitionProbabilities[tag1]:
-            tagTransitionProbabilities[tag1][tag2] = round(tagTransitionProbabilities[tag1][tag2] / tagCounts[tag1], 2)
+    for tag1 in tagCounts:
+        for tag2 in tagCounts:
+            tagTransitionProbabilities[tag1][tag2] = ((tagTransitionProbabilities[tag1][tag2] if tag2 in tagTransitionProbabilities[tag1] else 0) + 1) / (tagCounts[tag1] + len(tagCounts))
 
     return tagTransitionProbabilities
 
@@ -70,7 +70,7 @@ def getEmissionProbabilities(words, tags, tagCounts):
     
     for tag in emissionProbabilities:
         for word in emissionProbabilities[tag]:
-            emissionProbabilities[tag][word] = round(emissionProbabilities[tag][word] / tagCounts[tag], 2)
+            emissionProbabilities[tag][word] = emissionProbabilities[tag][word] / tagCounts[tag]
 
     return emissionProbabilities
 
@@ -83,11 +83,39 @@ def getStartingProbabilities(structuredTrainingData):
                 startingProbabilities[sentence[0][1]] = 0
             startingProbabilities[sentence[0][1]] += 1
     
-    for tag in startingProbabilities:
-        startingProbabilities[tag] = round(startingProbabilities[tag] / len(structuredTrainingData), 2)
+    for tag in tagCounts:
+        startingProbabilities[tag] = (startingProbabilities[tag] if tag in startingProbabilities else 0) / len(structuredTrainingData)
                 
     return startingProbabilities
 
+def viterbi(structuredTestingData, tagCounts, startingProbabilities, tagTransitionProbabilities, wordCounts, emissionProbabilities):
+    for sentence in structuredTestingData:
+        viterbiProbabilities = dict()
+        backTrack = dict()
+        for tag in tagCounts.keys():
+            viterbiProbabilities[tag] = list()
+            viterbiProbabilities[tag].append(startingProbabilities[tag] * emissionProbabilities[tag][sentence[0] if sentence[0] in list(wordCounts.keys()) else '<UNK>'])
+            backTrack[tag] = [0]
+        
+        for index, word in enumerate(sentence[1:]):
+            for tag in tagCounts.keys():     
+                maxProbability = max([(viterbiProbabilities[previousTag][index - 1]
+                                                        * tagTransitionProbabilities[previousTag][tag]
+                                                        * (emissionProbabilities[tag][word] if word in list(emissionProbabilities[tag]) else emissionProbabilities[tag]['<UNK>']), previousTag)
+                                                        for previousTag in tagCounts])
+                viterbiProbabilities[tag].append(maxProbability[0])
+                backTrack[tag].append(maxProbability[1])
+    
+        ans = max([(viterbiProbabilities[tag][-1], tag) for tag in list(tagCounts.keys())])
+        start = ans[1]
+        
+        print(viterbiProbabilities)
+
+        # for i in range(len(sentence)):
+        #     start = backTrack[start][-1 - i]
+        #     if start != 'O' and start != 0:
+        #         print(sentence[-1 -i], start)
+                
 trainingFileName = "S21-gene-train.txt"
 rawTrainingData = open(trainingFileName, 'r').readlines()
 
@@ -99,3 +127,9 @@ words, tags, tagCounts, wordCounts = handleUnkowns(words, tags, tagCounts, wordC
 tagTransitionProbabilities = getTagTransitionProbabilities(tags, tagCounts)
 emissionProbabilities = getEmissionProbabilities(words, tags, tagCounts)
 startingProbabilities = getStartingProbabilities(structuredTrainingData)
+
+testFileNAme = "F21-gene-test.txt"
+rawTestingData = open(testFileNAme, 'r').readlines()
+structuredTestingData = structureTrainingData(rawTestingData)
+
+viterbi(structuredTestingData[:1], tagCounts, startingProbabilities, tagTransitionProbabilities, wordCounts, emissionProbabilities)
